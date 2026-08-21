@@ -31,7 +31,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const pickImage = async (useCamera: boolean) => {
@@ -47,20 +46,16 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
       const result = useCamera
         ? await ImagePicker.launchCameraAsync({
-            base64: true,
-            quality: 0.7,
+            quality: 0.8,
             allowsEditing: true,
           })
         : await ImagePicker.launchImageLibraryAsync({
-            base64: true,
-            quality: 0.7,
+            quality: 0.8,
             allowsEditing: true,
           });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        setImageUri(asset.uri);
-        setImageBase64(`data:image/jpeg;base64,${asset.base64}`);
+        setImageUri(result.assets[0].uri);
       }
     } catch (err) {
       console.error('Error selecting image:', err);
@@ -74,7 +69,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       return;
     }
 
-    if (!imageBase64) {
+    if (!imageUri) {
       Alert.alert('Missing Image', 'Please capture or attach an invoice photo.');
       return;
     }
@@ -82,14 +77,14 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
     setIsSubmitting(true);
     try {
       try {
-        await apiService.submitInvoice(taskId, parsedAmount, imageBase64, description);
+        await apiService.submitInvoice(taskId, parsedAmount, imageUri, description);
         Alert.alert('Success', 'Invoice submitted & sent to AI queue!');
       } catch (networkErr) {
         // Offline fallback
         await storageService.saveOfflineInvoice({
           taskId,
           amount: parsedAmount,
-          imageBase64,
+          imageUri,
           description,
         });
         Alert.alert('Saved Offline', 'Network offline. Invoice saved locally & queued for auto-sync!');
@@ -99,7 +94,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       setAmount('');
       setDescription('');
       setImageUri(null);
-      setImageBase64(null);
       onSuccess();
       onClose();
     } catch (error: any) {

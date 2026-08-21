@@ -40,17 +40,21 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      const { employee } = await apiService.loginWithCode(code);
-      socketService.connect(employee.id);
+      const result = await apiService.loginWithCode(code);
+      const employee = result.employee;
+      if (employee?.id) {
+        socketService.connect(employee.id);
+      }
       router.replace('/(tabs)/map');
     } catch (error: any) {
-      // Demo / Fallback login for testing without live database backend
+      // Demo / Fallback login for testing without live database backend running
       if (code === '1234567890') {
         socketService.connect('emp_demo_101');
         router.replace('/(tabs)/map');
         return;
       }
-      Alert.alert('Login Failed', error.response?.data?.message || 'Invalid employee access code.');
+      const msg = error.response?.data?.errors?.[0]?.msg || error.response?.data?.error || 'Invalid employee 10-digit login code.';
+      Alert.alert('Login Failed', msg);
     } finally {
       setIsLoading(false);
     }

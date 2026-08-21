@@ -6,13 +6,13 @@ const OFFLINE_INVOICES_KEY = 'offline_invoices_queue';
 
 export const storageService = {
   // Save an invoice locally when network is unavailable
-  async saveOfflineInvoice(invoiceData: { taskId: string; amount: number; imageBase64: string; description?: string }): Promise<Invoice> {
+  async saveOfflineInvoice(invoiceData: { taskId: string; amount: number; imageUri: string; description?: string }): Promise<Invoice> {
     const existing = await this.getOfflineInvoices();
     const newInvoice: Invoice = {
       id: `offline_${Date.now()}`,
       taskId: invoiceData.taskId,
       amount: invoiceData.amount,
-      imageUrl: invoiceData.imageBase64,
+      imageUrl: invoiceData.imageUri,
       description: invoiceData.description,
       status: 'PENDING',
       syncedOffline: false,
