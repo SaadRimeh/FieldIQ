@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+    // ── Path Aliases (disabled) ──────────────────────────────────────────────
+    // Aliases like "@domain/*" require the `tsconfig-paths` package at runtime
+    // (e.g. ts-node-dev -r tsconfig-paths/register) and are NOT used anywhere
+    // in the current codebase. Re-enable only when:
+    //   1. tsconfig-paths is added to devDependencies
+    //   2. The dev script is updated: ts-node-dev -r tsconfig-paths/register ...
+    //   3. tsc-alias is added for compiled output
+    // "paths": {
+    //   "@domain/*":         ["./src/domain/*"],
+    //   "@application/*":    ["./src/application/*"],
+    //   "@infrastructure/*": ["./src/infrastructure/*"],
+    //   "@interfaces/*":     ["./src/interfaces/*"],
+    //   "@config/*":         ["./src/config/*"]
+    // }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.spec.ts"]
+}

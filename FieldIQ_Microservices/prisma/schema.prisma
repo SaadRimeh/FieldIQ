@@ -1,0 +1,184 @@
+// FieldIQ — Prisma Schema
+// Engine: PostgreSQL via @prisma/client
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+enum TaskStatus {
+  PENDING
+  CHECKED_IN
+  COMPLETED
+  SKIPPED
+}
+
+enum InvoiceStatus {
+  PENDING_REVIEW   // Uploaded, awaiting AI processing
+  PROCESSING       // In RabbitMQ / AI worker
+  APPROVED         // AI cleared, admin approved
+  FLAGGED          // AI anomaly detected
+  REJECTED         // Admin rejected
+}
+
+enum RouteStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMPLOYEE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Employee {
+  id          String   @id @default(uuid())
+  name        String
+  // AES-256 encrypted 10-digit login code (stored as cipher text)
+  loginCode   String   @unique @map("login_code")
+  role        Role     @default(EMPLOYEE)
+  points      Int      @default(0)
+  isActive    Boolean  @default(true) @map("is_active")
+  avatarUrl   String?  @map("avatar_url")
+
+  // Live location (updated via Socket.io every 10s)
+  lastLat     Float?   @map("last_lat")
+  lastLng     Float?   @map("last_lng")
+  lastSeenAt  DateTime? @map("last_seen_at")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
+
+  // Relations
+  routes      DailyRoute[]
+  tasks       Task[]
+
+  @@map("employees")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DAILY ROUTE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model DailyRoute {
+  id           String      @id @default(uuid())
+  employeeId   String      @map("employee_id")
+  date         DateTime    @db.Date
+  status       RouteStatus @default(ACTIVE)
+
+  // TSP-optimized ordered sequence of location labels
+  locationLabels String[]  @map("location_labels")
+
+  // Metadata from TSP algorithm
+  totalDistanceKm Float?   @map("total_distance_km")
+
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt      @map("updated_at")
+
+  // Relations
+  employee     Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  tasks        Task[]
+
+  @@unique([employeeId, date])
+  @@index([employeeId])
+  @@index([date])
+  @@map("daily_routes")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK  (one task = one location stop on a route)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Task {
+  id           String     @id @default(uuid())
+  routeId      String     @map("route_id")
+  employeeId   String     @map("employee_id")
+
+  // Location
+  label        String                        // Human-readable name
+  latitude     Float
+  longitude    Float
+  sequence     Int                           // TSP-determined stop order (1-5)
+
+  // Status
+  status       TaskStatus @default(PENDING)
+  checkedInAt  DateTime?  @map("checked_in_at")
+  completedAt  DateTime?  @map("completed_at")
+
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt      @map("updated_at")
+
+  // Relations
+  route        DailyRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  employee     Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  invoices     Invoice[]
+
+  @@index([routeId])
+  @@index([employeeId])
+  @@index([status])
+  @@map("tasks")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INVOICE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Invoice {
+  id              String        @id @default(uuid())
+  taskId          String        @map("task_id")
+
+  // Financial
+  amount          Float?                        // Extracted by OCR or manually entered
+  currency        String        @default("USD")
+  imageUrl        String        @map("image_url")  // Path to uploaded file
+
+  // Status & AI results
+  status          InvoiceStatus @default(PENDING_REVIEW)
+  isAnomaly       Boolean       @default(false) @map("is_anomaly")
+  anomalyScore    Float?        @map("anomaly_score")  // Isolation Forest score
+  ocrRawText      String?       @map("ocr_raw_text")   // Raw OCR dump
+  aiProcessedAt   DateTime?     @map("ai_processed_at")
+
+  // Admin review
+  adminNote       String?       @map("admin_note")
+  reviewedAt      DateTime?     @map("reviewed_at")
+
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt      @map("updated_at")
+
+  // Relations
+  task            Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([status])
+  @@index([isAnomaly])
+  @@map("invoices")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI FORECAST  (stored results from Python LinearRegression)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model CashFlowForecast {
+  id            String   @id @default(uuid())
+  forecastDate  DateTime @db.Date @map("forecast_date")
+  actualAmount  Float?   @map("actual_amount")
+  forecastedAmount Float @map("forecasted_amount")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([forecastDate])
+  @@map("cash_flow_forecasts")
+}

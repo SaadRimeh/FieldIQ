@@ -1,0 +1,7 @@
+# FieldIQ Microservices — .gitignore
+node_modules/
+dist/
+.env
+uploads/
+*.js.map
+prisma/migrations/
